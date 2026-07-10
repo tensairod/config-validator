@@ -11,6 +11,7 @@ from enum import Enum
 import pytest
 
 from config_validator.domain.field import UNSET, Field, FieldKind
+from config_validator.domain.secret import SecretValue
 
 
 class Environment(Enum):
@@ -101,6 +102,38 @@ class TestFieldImmutability:
         field = Field(name="port", kind=FieldKind.INT)
         with pytest.raises(FrozenInstanceError):
             field.name = "other_port"  # type: ignore[misc]
+
+
+class TestFieldSecretDefault:
+    def test_secret_field_with_default_is_wrapped_in_secret_value(self) -> None:
+        field = Field(
+            name="api_key", kind=FieldKind.STR, required=False, default="raw-key", secret=True
+        )
+        assert isinstance(field.default, SecretValue)
+        assert field.default.reveal() == "raw-key"
+
+    def test_secret_field_default_never_leaks_via_repr(self) -> None:
+        field = Field(
+            name="api_key", kind=FieldKind.STR, required=False, default="raw-key", secret=True
+        )
+        assert "raw-key" not in repr(field)
+
+    def test_secret_field_without_default_is_not_wrapped(self) -> None:
+        # required=True não tem default (UNSET) — nada para envolver.
+        field = Field(name="api_key", kind=FieldKind.STR, secret=True)
+        assert field.default is UNSET
+
+    def test_non_secret_field_default_stays_raw(self) -> None:
+        field = Field(name="timeout", kind=FieldKind.INT, required=False, default=30)
+        assert field.default == 30
+        assert not isinstance(field.default, SecretValue)
+
+    def test_passing_secret_value_directly_is_not_double_wrapped(self) -> None:
+        pre_wrapped = SecretValue("raw-key")
+        field = Field(
+            name="api_key", kind=FieldKind.STR, required=False, default=pre_wrapped, secret=True
+        )
+        assert field.default is pre_wrapped
 
 
 class TestUnsetSentinel:
