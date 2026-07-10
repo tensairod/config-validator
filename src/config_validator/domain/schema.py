@@ -9,10 +9,11 @@ validamos consistência.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from config_validator.domain.cross_validator import CrossValidator
 from config_validator.domain.field import Field
 
 NAMESPACE_SEPARATOR = "__"
@@ -21,31 +22,59 @@ NAMESPACE_SEPARATOR = "__"
 @dataclass(frozen=True)
 class Schema:
     """Representa o conjunto completo de campos de configuração esperados
-    por uma aplicação.
+    por uma aplicação, incluindo eventuais regras de validação cruzada.
 
     Args:
         fields: os campos que compõem o schema. A ordem é preservada (útil
             para a geração de documentação em ordem previsível, RF06).
+        cross_validators: regras de validação cruzada (RF04), executadas
+            após a validação individual de cada campo.
 
     Raises:
-        ValueError: se houver nomes duplicados, ou se um nome de campo
-            colidir com o prefixo de namespace de outro campo (ex: um campo
-            chamado 'db' e outro 'db__host' — 'db' não pode ser
-            simultaneamente um valor escalar e um namespace).
+        ValueError: se houver nomes de campo duplicados, colisão de
+            namespace, ou nomes de CrossValidator duplicados.
     """
 
     fields: tuple[Field, ...]
+    cross_validators: tuple[CrossValidator, ...] = ()
 
     def __post_init__(self) -> None:
         self._validate_no_duplicate_names()
         self._validate_no_namespace_collisions()
+        self._validate_no_duplicate_cross_validator_names()
 
     @classmethod
-    def of(cls, *fields: Field) -> Schema:
-        """Atalho ergonômico: Schema.of(field1, field2, ...) em vez de
-        Schema(fields=(field1, field2)).
+    def of(
+        cls,
+        *fields: Field,
+        cross_validators: tuple[CrossValidator, ...] = (),
+    ) -> Schema:
+        """Atalho ergonômico: Schema.of(field1, field2, cross_validators=(...))
+        em vez de Schema(fields=(field1, field2), cross_validators=(...)).
         """
-        return cls(fields=tuple(fields))
+        return cls(fields=tuple(fields), cross_validators=cross_validators)
+
+    def _validate_no_duplicate_cross_validator_names(self) -> None:
+        seen: set[str] = set()
+        for cv in self.cross_validators:
+            if cv.name in seen:
+                raise ValueError(
+                    f"CrossValidator duplicado no Schema: {cv.name!r}. Cada regra de "
+                    "validação cruzada deve ter um nome único."
+                )
+            seen.add(cv.name)
+
+    def run_cross_validators(self, values: Mapping[str, Any]) -> list[str]:
+        """Executa todas as validações cruzadas e agrega as mensagens de
+        erro de todas as regras violadas (ADR-004: erros agregados, não
+        fail-fast na primeira regra).
+        """
+        errors: list[str] = []
+        for cv in self.cross_validators:
+            message = cv.run(values)
+            if message is not None:
+                errors.append(message)
+        return errors
 
     def _validate_no_duplicate_names(self) -> None:
         seen: set[str] = set()

@@ -2,6 +2,7 @@
 
 import pytest
 
+from config_validator.domain.cross_validator import CrossValidator, cross_validator
 from config_validator.domain.field import Field, FieldKind
 from config_validator.domain.schema import Schema
 
@@ -60,6 +61,40 @@ class TestSchemaNamespaces:
         tree = schema.namespace_tree
         assert tree["db"]["host"] is db_host
         assert tree["cache"]["host"] is cache_host
+
+
+class TestSchemaCrossValidators:
+    def test_schema_without_cross_validators_defaults_to_empty(self) -> None:
+        schema = Schema.of(_str_field("a"))
+        assert schema.cross_validators == ()
+        assert schema.run_cross_validators({"a": "x"}) == []
+
+    def test_duplicate_cross_validator_name_raises(self) -> None:
+        cv1 = CrossValidator(name="rule", check=lambda values: None)
+        cv2 = CrossValidator(name="rule", check=lambda values: None)
+        with pytest.raises(ValueError, match="CrossValidator duplicado"):
+            Schema.of(_str_field("a"), cross_validators=(cv1, cv2))
+
+    def test_run_cross_validators_aggregates_all_violations(self) -> None:
+        @cross_validator(name="rule_1")
+        def check_1(values: dict) -> str | None:  # type: ignore[type-arg]
+            return "erro 1" if values.get("x") else None
+
+        @cross_validator(name="rule_2")
+        def check_2(values: dict) -> str | None:  # type: ignore[type-arg]
+            return "erro 2" if values.get("y") else None
+
+        schema = Schema.of(_str_field("x"), _str_field("y"), cross_validators=(check_1, check_2))
+        errors = schema.run_cross_validators({"x": True, "y": True})
+        assert errors == ["erro 1", "erro 2"]
+
+    def test_run_cross_validators_returns_empty_when_all_pass(self) -> None:
+        @cross_validator(name="rule")
+        def check(values: dict) -> str | None:  # type: ignore[type-arg]
+            return "erro" if values.get("x") else None
+
+        schema = Schema.of(_str_field("x"), cross_validators=(check,))
+        assert schema.run_cross_validators({"x": False}) == []
 
 
 class TestSchemaValidationErrors:

@@ -27,7 +27,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -e ".[dev]"
-      - run: mypy .
+      - run: mypy src
 
   test:
     name: Tests (Python ${{ matrix.python-version }})
