@@ -1,0 +1,95 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "config-validator"
+version = "0.1.0"
+description = "Type-safe configuration loading and validation that fails fast, clear, and at boot time."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Seu Nome", email = "seu@email.com" }
+]
+keywords = ["configuration", "validation", "pydantic", "settings", "env"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "pydantic>=2.5,<3.0",
+    "python-dotenv>=1.0,<2.0",
+    "typer>=0.9,<1.0",
+]
+
+[project.scripts]
+config-validator = "config_validator.cli.main:app"
+
+[project.urls]
+Homepage = "https://github.com/SEU_USUARIO/config-validator"
+Repository = "https://github.com/SEU_USUARIO/config-validator"
+Changelog = "https://github.com/SEU_USUARIO/config-validator/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0,<9.0",
+    "pytest-cov>=4.1,<5.0",
+    "mypy>=1.8,<2.0",
+    "ruff>=0.3,<1.0",
+]
+
+# ---------------------------------------------------------------------------
+# Ruff: lint + format (substitui flake8 + isort + black)
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W",   # pycodestyle + pyflakes
+    "I",             # isort
+    "N",             # pep8-naming
+    "UP",            # pyupgrade
+    "B",             # flake8-bugbear
+    "S",             # flake8-bandit (segurança)
+    "C4",            # flake8-comprehensions
+    "SIM",           # flake8-simplify
+]
+ignore = ["S101"]  # permite assert em testes
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+# ---------------------------------------------------------------------------
+# Mypy: type-check estrito (RNF02)
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+show_error_codes = true
+files = ["src"]
+
+# ---------------------------------------------------------------------------
+# Pytest + cobertura (RNF03: cobertura >= 90%)
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=config_validator --cov-report=term-missing --cov-report=xml --cov-fail-under=90"
+
+[tool.coverage.run]
+source = ["src/config_validator"]
+branch = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/config_validator"]

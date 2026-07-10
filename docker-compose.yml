@@ -1,0 +1,26 @@
+services:
+  lint:
+    build: .
+    command: ruff check .
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+
+  typecheck:
+    build: .
+    command: mypy .
+    volumes:
+      - ./src:/app/src
+
+  test:
+    build: .
+    command: pytest
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+
+  # Serviço "all" replica exatamente o que o GitHub Actions roda no CI,
+  # útil para reproduzir uma falha do CI localmente sem precisar abrir um PR.
+  all:
+    build: .
+    command: sh -c "ruff check . && mypy . && pytest"
