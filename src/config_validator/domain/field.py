@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from config_validator.domain.secret import SecretValue
+
 
 class FieldKind(Enum):
     """Tipos de dado suportados por um campo de configuração (RF02).
@@ -94,6 +96,7 @@ class Field:
         self._validate_enum_consistency()
         self._normalize_and_validate_list_consistency()
         self._validate_required_vs_default()
+        self._wrap_secret_default()
 
     def _validate_name(self) -> None:
         if not self.name:
@@ -138,6 +141,15 @@ class Field:
                 f"Field {self.name!r} está marcado como obrigatório (required=True) mas "
                 "recebeu um 'default'. Marque required=False ou remova o default."
             )
+
+    def _wrap_secret_default(self) -> None:
+        # Campos secretos com default precisam do default protegido também —
+        # do contrário, o repr() gerado automaticamente pelo dataclass (que
+        # imprime todos os atributos, incluindo 'default') vazaria o valor
+        # em texto puro. isinstance evita envolver duas vezes se o próprio
+        # usuário já passou um SecretValue como default.
+        if self.secret and self.has_default and not isinstance(self.default, SecretValue):
+            object.__setattr__(self, "default", SecretValue(self.default))
 
     @property
     def has_default(self) -> bool:
