@@ -67,6 +67,10 @@ ignore = ["S101"]  # permite assert em testes
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]
+# B008 (function call in default) dispara para typer.Option(...)/typer.Argument(...)
+# como default de parâmetro — esse é o padrão idiomático e documentado do próprio
+# Typer para declarar opções de CLI, não um bug real a ser corrigido.
+"src/config_validator/cli/*" = ["B008"]
 
 # ---------------------------------------------------------------------------
 # Mypy: type-check estrito (RNF02)
