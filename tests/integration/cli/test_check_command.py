@@ -44,7 +44,7 @@ class TestCheckCommandSuccess:
         env_file.write_text("database_url=postgres://localhost\nport=5432\n")
 
         result = runner.invoke(
-            app, ["--schema", schema_module, "--env-file", str(env_file)]
+            app, ["check", "--schema", schema_module, "--env-file", str(env_file)]
         )
 
         assert result.exit_code == 0
@@ -59,6 +59,7 @@ class TestCheckCommandSuccess:
         result = runner.invoke(
             app,
             [
+                "check",
                 "--schema",
                 schema_module,
                 "--env-file",
@@ -77,7 +78,7 @@ class TestCheckCommandFailure:
         env_file.write_text("port=5432\n")  # database_url ausente
 
         result = runner.invoke(
-            app, ["--schema", schema_module, "--env-file", str(env_file)]
+            app, ["check", "--schema", schema_module, "--env-file", str(env_file)]
         )
 
         assert result.exit_code == 1
@@ -89,7 +90,7 @@ class TestCheckCommandFailure:
         env_file.write_text("database_url=postgres://localhost\nport=not-a-number\n")
 
         result = runner.invoke(
-            app, ["--schema", schema_module, "--env-file", str(env_file)]
+            app, ["check", "--schema", schema_module, "--env-file", str(env_file)]
         )
 
         assert result.exit_code == 1
@@ -100,7 +101,8 @@ class TestCheckCommandFailure:
         env_file.write_text("")
 
         result = runner.invoke(
-            app, ["--schema", "formato_invalido_sem_dois_pontos", "--env-file", str(env_file)]
+            app,
+            ["check", "--schema", "formato_invalido_sem_dois_pontos", "--env-file", str(env_file)],
         )
 
         assert result.exit_code != 0
@@ -111,7 +113,7 @@ class TestCheckCommandFailure:
 
         result = runner.invoke(
             app,
-            ["--schema", "modulo_inexistente_xyz:schema", "--env-file", str(env_file)],
+            ["check", "--schema", "modulo_inexistente_xyz:schema", "--env-file", str(env_file)],
         )
 
         assert result.exit_code != 0
