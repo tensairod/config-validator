@@ -51,9 +51,9 @@ graph TB
 | Camada | Status | Componentes prontos |
 |---|---|---|
 | **Domain** | ✅ Completo (M1) | `Field`, `Schema`, `CrossValidator`, `SecretValue` |
-| **Application** | ⏳ Não iniciado (M2/M3) | `Loader`, `Merger`, `Validator`, `ErrorFormatter`, `DocsGenerator` |
-| **Infrastructure** | ⏳ Não iniciado (M2) | `EnvVarSource`, `DotEnvSource` |
-| **Interface (CLI)** | ⏳ Não iniciado (M4) | `config-validator check`, `config-validator docs` |
+| **Application** | ✅ Completo (M2/M3) | `Loader`, `ConfigSource`, `Validator`, `ErrorFormatter`, `ConfigBuilder` |
+| **Infrastructure** | ✅ Completo (M2) | `EnvVarSource`, `DotEnvSource` |
+| **Interface (CLI)** | ✅ Completo (M4) | `config-validator check`, `config-validator docs` |
 
 ## Decisões arquiteturais (ADRs)
 
@@ -70,33 +70,40 @@ Ver `docs/adr/` para o detalhamento completo de cada decisão. Resumo:
 > percam entre uma issue e outra. Cada item aqui deve ser resolvido ou
 > reavaliado explicitamente quando o milestone correspondente for aberto.
 
-### 1. `SecretValue` protege o `default` do `Field`, mas ainda não o valor resolvido em runtime
+### 1. `SecretValue` protege o `default` do `Field` e o valor resolvido em runtime
 
-**Status:** parcialmente resolvido (Issue #4, M1).
+**Status:** ✅ resolvido (Issue #4, M1 + Issue #7, M3).
 
-O que já funciona: quando um `Field(secret=True)` tem um `default`, esse
-`default` é automaticamente envolvido em `SecretValue` — o `repr()` do
-próprio `Field` não vaza mais o valor.
+Quando um `Field(secret=True)` tem um `default`, esse `default` é
+automaticamente envolvido em `SecretValue` desde a Issue #4 — o `repr()`
+do próprio `Field` não vaza o valor.
 
-O que **ainda não** funciona: quando o valor de um campo secreto vem de
-uma fonte real (env var ou `.env`), o `Loader`/`Validator` (Application
-layer, ainda não implementados) precisam envolver esse valor resolvido em
-`SecretValue` também, antes de expô-lo no objeto de configuração final.
-Sem isso, `config.api_key` devolveria uma `str` crua, e qualquer
-`logger.info(f"Config: {config}")` no código do usuário da lib vazaria a
-env var real — o cenário exato que `SecretValue` foi criado para evitar.
-
-**Ação pendente:** ao implementar o `Validator` (Issue #7, M3), garantir
-que todo campo com `field.secret is True` tenha seu valor final envolvido
-em `SecretValue` antes de ser atribuído ao objeto de configuração —
-independentemente de ter vindo de `default`, env var ou `.env`. Adicionar
-teste de integração explícito para este caso (não só testes unitários do
-`SecretValue` isolado).
+Desde a Issue #7, o `Validator` também envolve em `SecretValue` o valor
+final *resolvido* (vindo de env var, `.env`, ou do próprio default),
+antes de devolvê-lo no dict de configuração — e o `ConfigBuilder`
+(Issue #8) preserva esse mascaramento em toda a árvore aninhada de
+`ConfigNamespace`. Coberto por testes de integração ponta a ponta em
+`test_validator.py` (`TestValidatorSecretWrapping`) e
+`test_config_builder.py` (`test_secret_field_masked_in_repr_through_the_full_tree`).
 
 ### 2. `Schema.namespace_tree` retorna `dict` cru, não uma classe tipada
 
-**Status:** decisão adiada deliberadamente (Issue #2, M1).
+**Status:** decisão adiada deliberadamente (Issue #2, M1) — ainda válida.
 
-Ver ADR correspondente a ser criado se a dor aparecer durante a
-implementação do `Validator` (M3), quando ele precisar percorrer a árvore
-para montar o objeto de configuração final aninhado.
+O `ConfigBuilder` (Issue #8) já percorre essa árvore com sucesso usando
+`isinstance(node, Field)` para diferenciar folha de sub-namespace. Não
+apareceu dor real o suficiente para justificar uma classe `NamespaceNode`
+tipada até agora — mantido como está.
+
+### 3. `docs` só suporta `--format table` e `--format json`
+
+**Status:** registrado como roadmap futuro (Issue #10, M4).
+
+`--format markdown` seria útil para colar a documentação de configuração
+direto em um README de projeto, sem reformatação manual. Não implementado
+ainda porque não fazia parte do escopo original da RF06, mas a lógica de
+formatação já está isolada (`_print_table` / `json.dumps`), então
+adicionar um terceiro branch de formato é uma extensão barata quando for
+priorizado — provável candidato para o M5 (Docs, Packaging & Release),
+já que nesse ponto o próprio README principal do projeto estará sendo
+escrito.
