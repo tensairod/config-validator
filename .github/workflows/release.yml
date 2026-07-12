@@ -1,0 +1,51 @@
+name: Release
+
+# Disparado ao enviar uma tag de versão (ex: v1.0.0). Reaproveita o job
+# de build do ci.yml conceitualmente, mas roda separado porque este
+# workflow tem permissão de publicar no PyPI — algo que não deve rodar
+# em todo push/PR, só em releases deliberadas.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build-and-publish:
+    name: Build and publish to PyPI
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      # Necessário para PyPI Trusted Publishing (OIDC) — não usamos um
+      # token de API armazenado como secret, o PyPI confia diretamente
+      # na identidade deste workflow do GitHub Actions.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify tag matches package version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag v$TAG_VERSION does not match pyproject.toml version $PKG_VERSION"
+            exit 1
+          fi
+
+      - name: Run full quality suite before releasing
+        run: |
+          pip install -e ".[dev]"
+          ruff check .
+          mypy src
+          pytest
+
+      - name: Build package
+        run: |
+          pip install build
+          python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "config-validator"
-version = "0.1.0"
+version = "1.0.0"
 description = "Type-safe configuration loading and validation that fails fast, clear, and at boot time."
 readme = "README.md"
 license = "MIT"
